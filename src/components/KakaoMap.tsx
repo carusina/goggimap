@@ -1,7 +1,6 @@
 'use client'
 
 import Script from 'next/script'
-import { useRouter } from 'next/navigation'
 import { useRef } from 'react'
 import type { Restaurant } from '@/types'
 
@@ -15,13 +14,14 @@ declare global {
 interface KakaoMapProps {
   restaurants: Restaurant[]
   center?: { lat: number; lng: number }
+  onMarkerClick?: (restaurant: Restaurant) => void
 }
 
 export default function KakaoMap({
   restaurants,
-  center = { lat: 35.1796, lng: 129.0756 }
+  center = { lat: 35.1796, lng: 129.0756 },
+  onMarkerClick
 }: KakaoMapProps) {
-  const router = useRouter()
   const markersRef = useRef<any[]>([])
 
   const initMap = () => {
@@ -51,7 +51,9 @@ export default function KakaoMap({
           infowindow.close()
         })
         window.kakao.maps.event.addListener(marker, 'click', () => {
-          router.push(`/restaurants/${restaurant.id}`)
+          if (onMarkerClick) {
+            onMarkerClick(restaurant)
+          }
         })
 
         markersRef.current.push(marker)
