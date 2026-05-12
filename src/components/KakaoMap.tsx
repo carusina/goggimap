@@ -17,17 +17,29 @@ interface KakaoMapProps {
   onMarkerClick?: (restaurant: Restaurant) => void
 }
 
+function makePriceSvg(price: number): string {
+  const text = `${price.toLocaleString()}원`
+  const width = Math.max(64, text.length * 8 + 28)
+  const height = 32
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <rect x="1.5" y="1.5" width="${width - 3}" height="${height - 3}" rx="15" ry="15"
+      fill="white" stroke="#111827" stroke-width="2"/>
+    <text x="${width / 2}" y="21"
+      font-family="-apple-system,BlinkMacSystemFont,sans-serif"
+      font-size="13" font-weight="700" fill="#111827" text-anchor="middle">${text}</text>
+  </svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
 export default function KakaoMap({
   restaurants,
   center = { lat: 35.1796, lng: 129.0756 },
   onMarkerClick
 }: KakaoMapProps) {
   const markersRef = useRef<any[]>([])
-  const overlaysRef = useRef<any[]>([])
 
   const initMap = () => {
     if (!window.kakao?.maps) return
-
     const container = document.getElementById('kakao-map')
     if (!container) return
 
@@ -37,59 +49,26 @@ export default function KakaoMap({
         level: 6
       })
 
-      // 클러스터러용 투명 마커 이미지 (1×1 gif)
-      const invisibleImage = new window.kakao.maps.MarkerImage(
-        'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-        new window.kakao.maps.Size(1, 1)
-      )
-
-      const overlays: any[] = []
       const markers = restaurants.map((restaurant) => {
         const position = new window.kakao.maps.LatLng(restaurant.lat, restaurant.lng)
+        const width = Math.max(64, `${restaurant.corkage_fee.toLocaleString()}원`.length * 8 + 28)
+        const image = new window.kakao.maps.MarkerImage(
+          makePriceSvg(restaurant.corkage_fee),
+          new window.kakao.maps.Size(width, 32),
+          { offset: new window.kakao.maps.Point(width / 2, 16) }
+        )
+        const marker = new window.kakao.maps.Marker({ position, image })
 
-        // 클러스터러에 넘길 투명 마커
-        const marker = new window.kakao.maps.Marker({ position, image: invisibleImage })
-
-        // 가격 뱃지 오버레이
-        const el = document.createElement('div')
-        el.textContent = `${restaurant.corkage_fee.toLocaleString()}원`
-        Object.assign(el.style, {
-          background: 'white',
-          border: '2px solid #111827',
-          borderRadius: '20px',
-          padding: '5px 12px',
-          fontSize: '13px',
-          fontWeight: '700',
-          whiteSpace: 'nowrap',
-          cursor: 'pointer',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-          userSelect: 'none',
+        window.kakao.maps.event.addListener(marker, 'click', () => {
+          onMarkerClick?.(restaurant)
         })
 
-        el.addEventListener('click', () => onMarkerClick?.(restaurant))
-        el.addEventListener('mouseover', () => {
-          el.style.background = '#111827'
-          el.style.color = 'white'
-        })
-        el.addEventListener('mouseout', () => {
-          el.style.background = 'white'
-          el.style.color = ''
-        })
-
-        const overlay = new window.kakao.maps.CustomOverlay({
-          position,
-          content: el,
-          yAnchor: 1.4,
-        })
-
-        overlays.push(overlay)
         return marker
       })
 
       markersRef.current = markers
-      overlaysRef.current = overlays
 
-      const clusterer = new window.kakao.maps.MarkerClusterer({
+      new window.kakao.maps.MarkerClusterer({
         map,
         markers,
         averageCenter: true,
@@ -109,30 +88,6 @@ export default function KakaoMap({
           }
         ]
       })
-
-      // minLevel 미만(줌인): 클러스터링 비활성 → clusteringend 미발화
-      // minLevel 이상(줌아웃): clusteringend 발화 → 클러스터에 묶인 것만 숨김
-      const syncOverlays = () => {
-        const level = map.getLevel()
-        if (level < 5) {
-          overlays.forEach(o => o.setMap(map))
-          return
-        }
-        const clusteredSet = new Set<any>()
-        clusterer.getClusters().forEach((cluster: any) => {
-          if (cluster.getMarkers().length > 1) {
-            cluster.getMarkers().forEach((m: any) => clusteredSet.add(m))
-          }
-        })
-        markers.forEach((marker, i) => {
-          overlays[i].setMap(clusteredSet.has(marker) ? null : map)
-        })
-      }
-
-      window.kakao.maps.event.addListener(clusterer, 'clusteringend', syncOverlays)
-      // zoom_changed는 애니메이션 중간에도 발화해서 타이밍이 꼬임
-      // idle은 지도 이동·줌이 완전히 끝난 뒤 한 번만 발화
-      window.kakao.maps.event.addListener(map, 'idle', syncOverlays)
     })
   }
 
