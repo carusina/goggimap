@@ -23,6 +23,7 @@ export default function KakaoMap({
   onMarkerClick
 }: KakaoMapProps) {
   const markersRef = useRef<any[]>([])
+  const overlaysRef = useRef<any[]>([])
 
   const initMap = () => {
     if (!window.kakao?.maps) return
@@ -36,30 +37,59 @@ export default function KakaoMap({
         level: 6
       })
 
+      // 클러스터러용 투명 마커 이미지 (1×1 gif)
+      const invisibleImage = new window.kakao.maps.MarkerImage(
+        'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+        new window.kakao.maps.Size(1, 1)
+      )
+
+      const overlays: any[] = []
       const markers = restaurants.map((restaurant) => {
         const position = new window.kakao.maps.LatLng(restaurant.lat, restaurant.lng)
-        const marker = new window.kakao.maps.Marker({ position })
 
-        const infowindow = new window.kakao.maps.InfoWindow({
-          content: `<div style="padding:6px 10px;font-size:13px;font-weight:600;white-space:nowrap;">${restaurant.name}</div>`
+        // 클러스터러에 넘길 투명 마커
+        const marker = new window.kakao.maps.Marker({ position, image: invisibleImage })
+
+        // 가격 뱃지 오버레이
+        const el = document.createElement('div')
+        el.textContent = `${restaurant.corkage_fee.toLocaleString()}원`
+        Object.assign(el.style, {
+          background: 'white',
+          border: '2px solid #111827',
+          borderRadius: '20px',
+          padding: '5px 12px',
+          fontSize: '13px',
+          fontWeight: '700',
+          whiteSpace: 'nowrap',
+          cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+          userSelect: 'none',
         })
 
-        window.kakao.maps.event.addListener(marker, 'mouseover', () => {
-          infowindow.open(map, marker)
+        el.addEventListener('click', () => onMarkerClick?.(restaurant))
+        el.addEventListener('mouseover', () => {
+          el.style.background = '#111827'
+          el.style.color = 'white'
         })
-        window.kakao.maps.event.addListener(marker, 'mouseout', () => {
-          infowindow.close()
-        })
-        window.kakao.maps.event.addListener(marker, 'click', () => {
-          onMarkerClick?.(restaurant)
+        el.addEventListener('mouseout', () => {
+          el.style.background = 'white'
+          el.style.color = ''
         })
 
+        const overlay = new window.kakao.maps.CustomOverlay({
+          position,
+          content: el,
+          yAnchor: 1.4,
+        })
+
+        overlays.push(overlay)
         return marker
       })
 
       markersRef.current = markers
+      overlaysRef.current = overlays
 
-      new window.kakao.maps.MarkerClusterer({
+      const clusterer = new window.kakao.maps.MarkerClusterer({
         map,
         markers,
         averageCenter: true,
@@ -78,6 +108,25 @@ export default function KakaoMap({
             boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
           }
         ]
+      })
+
+      // 클러스터링 시작 전 모든 오버레이 숨김
+      window.kakao.maps.event.addListener(clusterer, 'clusteringbegin', () => {
+        overlays.forEach(o => o.setMap(null))
+      })
+
+      // 클러스터링 완료 후 단독 마커에만 오버레이 표시
+      window.kakao.maps.event.addListener(clusterer, 'clusteringend', (target: any) => {
+        const clusteredSet = new Set<any>()
+        target.getClusters().forEach((cluster: any) => {
+          if (cluster.getMarkers().length > 1) {
+            cluster.getMarkers().forEach((m: any) => clusteredSet.add(m))
+          }
+        })
+
+        markers.forEach((marker, i) => {
+          overlays[i].setMap(clusteredSet.has(marker) ? null : map)
+        })
       })
     })
   }
