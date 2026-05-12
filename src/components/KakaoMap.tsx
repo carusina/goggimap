@@ -110,24 +110,27 @@ export default function KakaoMap({
         ]
       })
 
-      // 클러스터링 시작 전 모든 오버레이 숨김
-      window.kakao.maps.event.addListener(clusterer, 'clusteringbegin', () => {
-        overlays.forEach(o => o.setMap(null))
-      })
-
-      // 클러스터링 완료 후 단독 마커에만 오버레이 표시
-      window.kakao.maps.event.addListener(clusterer, 'clusteringend', (target: any) => {
+      // minLevel 미만(줌인): 클러스터링 비활성 → clusteringend 미발화
+      // minLevel 이상(줌아웃): clusteringend 발화 → 클러스터에 묶인 것만 숨김
+      const syncOverlays = () => {
+        const level = map.getLevel()
+        if (level < 5) {
+          overlays.forEach(o => o.setMap(map))
+          return
+        }
         const clusteredSet = new Set<any>()
-        target.getClusters().forEach((cluster: any) => {
+        clusterer.getClusters().forEach((cluster: any) => {
           if (cluster.getMarkers().length > 1) {
             cluster.getMarkers().forEach((m: any) => clusteredSet.add(m))
           }
         })
-
         markers.forEach((marker, i) => {
           overlays[i].setMap(clusteredSet.has(marker) ? null : map)
         })
-      })
+      }
+
+      window.kakao.maps.event.addListener(clusterer, 'clusteringend', syncOverlays)
+      window.kakao.maps.event.addListener(map, 'zoom_changed', syncOverlays)
     })
   }
 
