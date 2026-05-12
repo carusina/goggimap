@@ -129,12 +129,10 @@ export default function KakaoMap({
         })
       }
 
-      // 줌아웃(≥ minLevel): clusteringend 이후 클러스터 상태 확정
       window.kakao.maps.event.addListener(clusterer, 'clusteringend', syncOverlays)
-      // 줌인(< minLevel): clusteringend 미발화이므로 직접 처리
-      window.kakao.maps.event.addListener(map, 'zoom_changed', () => {
-        if (map.getLevel() < 5) overlays.forEach(o => o.setMap(map))
-      })
+      // zoom_changed는 애니메이션 중간에도 발화해서 타이밍이 꼬임
+      // idle은 지도 이동·줌이 완전히 끝난 뒤 한 번만 발화
+      window.kakao.maps.event.addListener(map, 'idle', syncOverlays)
     })
   }
 
