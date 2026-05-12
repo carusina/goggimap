@@ -129,8 +129,12 @@ export default function KakaoMap({
         })
       }
 
+      // 줌아웃(≥ minLevel): clusteringend 이후 클러스터 상태 확정
       window.kakao.maps.event.addListener(clusterer, 'clusteringend', syncOverlays)
-      window.kakao.maps.event.addListener(map, 'zoom_changed', syncOverlays)
+      // 줌인(< minLevel): clusteringend 미발화이므로 직접 처리
+      window.kakao.maps.event.addListener(map, 'zoom_changed', () => {
+        if (map.getLevel() < 5) overlays.forEach(o => o.setMap(map))
+      })
     })
   }
 
