@@ -36,9 +36,9 @@ export default function KakaoMap({
         level: 6
       })
 
-      restaurants.forEach((restaurant) => {
+      const markers = restaurants.map((restaurant) => {
         const position = new window.kakao.maps.LatLng(restaurant.lat, restaurant.lng)
-        const marker = new window.kakao.maps.Marker({ position, map })
+        const marker = new window.kakao.maps.Marker({ position })
 
         const infowindow = new window.kakao.maps.InfoWindow({
           content: `<div style="padding:6px 10px;font-size:13px;font-weight:600;white-space:nowrap;">${restaurant.name}</div>`
@@ -51,12 +51,33 @@ export default function KakaoMap({
           infowindow.close()
         })
         window.kakao.maps.event.addListener(marker, 'click', () => {
-          if (onMarkerClick) {
-            onMarkerClick(restaurant)
-          }
+          onMarkerClick?.(restaurant)
         })
 
-        markersRef.current.push(marker)
+        return marker
+      })
+
+      markersRef.current = markers
+
+      new window.kakao.maps.MarkerClusterer({
+        map,
+        markers,
+        averageCenter: true,
+        minLevel: 5,
+        styles: [
+          {
+            width: '44px',
+            height: '44px',
+            background: 'rgba(239, 68, 68, 0.85)',
+            borderRadius: '50%',
+            color: '#fff',
+            textAlign: 'center',
+            fontWeight: '700',
+            lineHeight: '44px',
+            fontSize: '15px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+          }
+        ]
       })
     })
   }
@@ -72,7 +93,7 @@ export default function KakaoMap({
   return (
     <>
       <Script
-        src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false`}
+        src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false&libraries=clusterer`}
         onLoad={initMap}
       />
       <div id="kakao-map" className="w-full h-full min-h-[400px]" />
