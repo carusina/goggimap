@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ reservationId: reservation.id })
   } catch (err) {
     console.error('Reservation API Error:', err)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const message = err instanceof Error ? err.message : (err as any)?.message ?? '서버 오류'
     return NextResponse.json({ error: message }, { status: 500 })
   }
