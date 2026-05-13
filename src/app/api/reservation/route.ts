@@ -3,6 +3,10 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase environment variables are missing.')
+    }
+
     const supabase = createServerSupabaseClient()
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -43,7 +47,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ reservationId: reservation.id })
   } catch (err) {
-    const message = err instanceof Error ? err.message : '서버 오류'
+    console.error('Reservation API Error:', err)
+    const message = err instanceof Error ? err.message : (err as any)?.message ?? '서버 오류'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

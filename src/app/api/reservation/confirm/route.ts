@@ -27,6 +27,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${origin}/?error=amount_mismatch`)
     }
 
+    if (!process.env.TOSS_SECRET_KEY) {
+      throw new Error('TOSS_SECRET_KEY is missing.')
+    }
+
     // 토스페이먼츠 결제 승인
     const tossRes = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
       method: 'POST',

@@ -62,3 +62,17 @@ create policy "reservations_owner_read" on reservations
       where r.id = restaurant_id and r.owner_id = auth.uid()
     )
   );
+
+-- 유저 가입 시 자동으로 프로필을 생성하는 함수 및 트리거
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, name, role)
+  values (new.id, new.raw_user_meta_data->>'full_name', 'customer');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
