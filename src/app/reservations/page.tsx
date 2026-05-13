@@ -7,18 +7,16 @@ import { Separator } from '@/components/ui/separator'
 import { CalendarDays, Users, Store } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import type { Reservation, Restaurant } from '@/types'
+import type { ReservationWithDetails } from '@/types'
 
 const STATUS_LABEL: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  pending: { label: '결제 대기', variant: 'secondary' },
+  pending:   { label: '결제 대기', variant: 'secondary' },
   confirmed: { label: '예약 확정', variant: 'default' },
-  cancelled: { label: '취소됨', variant: 'destructive' }
+  cancelled: { label: '취소됨',   variant: 'destructive' },
 }
 
-type ReservationWithRestaurant = Reservation & { restaurants: Restaurant }
-
 export default async function ReservationsPage() {
-  let reservations: ReservationWithRestaurant[] = []
+  let reservations: ReservationWithDetails[] = []
 
   try {
     const supabase = createServerSupabaseClient()
@@ -27,12 +25,19 @@ export default async function ReservationsPage() {
     if (user) {
       const { data, error } = await supabase
         .from('reservations')
-        .select('*, restaurants(*)')
+        .select(`
+          *,
+          restaurants (*),
+          order_items (
+            *,
+            meat_products (*)
+          )
+        `)
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      reservations = (data as ReservationWithRestaurant[]) ?? []
+      reservations = (data as unknown as ReservationWithDetails[]) ?? []
     }
   } catch (e) {
     console.error('Failed to fetch reservations:', e)
@@ -44,9 +49,7 @@ export default async function ReservationsPage() {
         <div className="py-16 space-y-4">
           <div className="text-5xl">🥩</div>
           <h2 className="text-lg font-semibold">예약 내역이 없습니다</h2>
-          <p className="text-sm text-muted-foreground">
-            콜키지 가게를 찾아 예약해보세요
-          </p>
+          <p className="text-sm text-muted-foreground">콜키지 가게를 찾아 예약해보세요</p>
           <Link href="/">
             <Button>가게 찾기</Button>
           </Link>
@@ -62,49 +65,57 @@ export default async function ReservationsPage() {
         {reservations.map((r) => {
           const status = STATUS_LABEL[r.status] ?? STATUS_LABEL.pending
           const reservedDate = new Date(r.reserved_at)
+          const meatSummary = r.order_items
+            .map((item) => `${item.meat_products.name} ×${item.quantity}`)
+            .join(', ')
 
           return (
-            <Card key={r.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Store className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-semibold">{r.restaurants?.name}</span>
-                  </div>
-                  <Badge variant={status.variant}>{status.label}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0 space-y-2">
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <CalendarDays className="w-3.5 h-3.5" />
-                    <span>
-                      {reservedDate.toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}{' '}
-                      {reservedDate.toLocaleTimeString('ko-KR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
-                    <span>{r.party_size}명</span>
-                  </div>
-                </div>
-                {r.payment_amount && (
-                  <>
-                    <Separator />
-                    <div className="text-sm font-medium">
-                      결제 금액: {r.payment_amount.toLocaleString()}원
+            <Link key={r.id} href={`/reservations/${r.id}`}>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Store className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-semibold">{r.restaurants?.name}</span>
                     </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                    <Badge variant={status.variant}>{status.label}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-2">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <CalendarDays className="w-3.5 h-3.5" />
+                      <span>
+                        {reservedDate.toLocaleDateString('ko-KR', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}{' '}
+                        {reservedDate.toLocaleTimeString('ko-KR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5" />
+                      <span>{r.party_size}명</span>
+                    </div>
+                  </div>
+                  {meatSummary && (
+                    <>
+                      <Separator />
+                      <div className="text-sm text-muted-foreground truncate">{meatSummary}</div>
+                      {r.payment_amount && (
+                        <div className="text-sm font-medium">
+                          {r.payment_amount.toLocaleString()}원 결제
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </Link>
           )
         })}
       </div>

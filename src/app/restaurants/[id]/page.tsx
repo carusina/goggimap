@@ -2,55 +2,45 @@ export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { MapPin, Users, Clock, ChevronLeft } from 'lucide-react'
+import { MapPin, Users, ChevronLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import type { Restaurant } from '@/types'
-
-const AVAILABLE_TIMES = ['11:00', '12:00', '13:00', '14:00', '17:00', '18:00', '19:00', '20:00']
+import type { MeatProduct, Restaurant } from '@/types'
+import ReservationFlow from '@/components/ReservationFlow'
 
 interface PageProps {
   params: { id: string }
 }
 
 export default async function RestaurantDetailPage({ params }: PageProps) {
-  let restaurant: Restaurant | null = null
+  const supabase = createServerSupabaseClient()
 
-  try {
-    const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase
-      .from('restaurants')
-      .select('*')
-      .eq('id', params.id)
-      .single()
+  const [{ data: restaurant, error }, { data: meatProducts }] = await Promise.all([
+    supabase.from('restaurants').select('*').eq('id', params.id).single(),
+    supabase.from('meat_products').select('*').eq('is_available', true).order('price'),
+  ])
 
-    if (error) throw error
-    restaurant = data
-  } catch {
-    notFound()
-  }
+  if (error || !restaurant) notFound()
 
-  if (!restaurant) notFound()
-
-  const r = restaurant
+  const r = restaurant as Restaurant
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
-      <Link href="/" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        href="/"
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ChevronLeft className="w-4 h-4" />
         목록으로
       </Link>
 
-      {/* 이미지 */}
       {r.image_url && (
         <div className="w-full h-64 rounded-xl overflow-hidden bg-muted">
           <img src={r.image_url} alt={r.name} className="w-full h-full object-cover" />
         </div>
       )}
 
-      {/* 헤더 */}
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-2xl font-bold">{r.name}</h1>
@@ -64,13 +54,10 @@ export default async function RestaurantDetailPage({ params }: PageProps) {
 
       <Separator />
 
-      {/* 주요 정보 */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-muted rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold">
-            {r.corkage_fee.toLocaleString()}원
-          </div>
-          <div className="text-xs text-muted-foreground mt-1">1인 콜키지 비용</div>
+          <div className="text-2xl font-bold">{r.corkage_fee.toLocaleString()}원</div>
+          <div className="text-xs text-muted-foreground mt-1">1인 콜키지 (현장 결제)</div>
         </div>
         <div className="bg-muted rounded-xl p-4 text-center">
           <div className="flex items-center justify-center gap-1 text-2xl font-bold">
@@ -87,27 +74,10 @@ export default async function RestaurantDetailPage({ params }: PageProps) {
 
       <Separator />
 
-      {/* 예약 가능 시간 */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4" />
-          <h3 className="font-semibold">예약 가능 시간</h3>
-        </div>
-        <div className="grid grid-cols-4 gap-2">
-          {AVAILABLE_TIMES.map((time) => (
-            <button
-              key={time}
-              className="border rounded-lg p-2 text-center text-sm hover:bg-primary hover:text-primary-foreground transition-colors"
-            >
-              {time}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Button className="w-full" size="lg" disabled>
-        예약하기 (2주차 구현 예정)
-      </Button>
+      <ReservationFlow
+        restaurant={r}
+        meatProducts={(meatProducts ?? []) as MeatProduct[]}
+      />
     </div>
   )
 }
