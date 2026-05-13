@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
     if (oError) throw oError
 
     return NextResponse.json({ reservationId: reservation.id })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message ?? '서버 오류' }, { status: 500 })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '서버 오류'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

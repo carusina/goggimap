@@ -51,8 +51,8 @@ export async function GET(req: NextRequest) {
     if (uError) throw uError
 
     return NextResponse.redirect(`${origin}/reservations/${orderId}`)
-  } catch (err: any) {
-    console.error('Payment confirm error:', err.message)
+  } catch (err) {
+    console.error('Payment confirm error:', err instanceof Error ? err.message : err)
     return NextResponse.redirect(`${origin}/?error=payment_failed`)
   }
 }

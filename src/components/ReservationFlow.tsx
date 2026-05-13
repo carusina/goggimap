@@ -1,6 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
+interface TossPaymentRequest {
+  method: string
+  orderId: string
+  orderName: string
+  amount: { currency: string; value: number }
+  successUrl: string
+  failUrl: string
+}
+
+declare global {
+  interface Window {
+    TossPayments: (clientKey: string) => {
+      payment: (opts: { customerKey: string }) => {
+        requestPayment: (opts: TossPaymentRequest) => Promise<void>
+      }
+    }
+  }
+}
 import Script from 'next/script'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
@@ -105,7 +124,7 @@ export default function ReservationFlow({
       if (!res.ok) throw new Error(json.error ?? '예약 생성 실패')
 
       const { reservationId } = json
-      const toss = (window as any).TossPayments(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!)
+      const toss = window.TossPayments(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!)
       const payment = toss.payment({ customerKey: userId })
 
       await payment.requestPayment({
@@ -116,8 +135,8 @@ export default function ReservationFlow({
         successUrl: `${window.location.origin}/api/reservation/confirm`,
         failUrl: `${window.location.origin}/restaurants/${restaurant.id}`,
       })
-    } catch (err: any) {
-      alert(err.message)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '결제 중 오류가 발생했습니다.')
       setIsLoading(false)
     }
   }
